@@ -1,0 +1,6 @@
+{
+  "summary":  "Plano de implementação detalhado para o IBEC Express | Central de Solicitações, cobrindo arquitetura full stack Vite + Node/Express (compatível com Vercel Functions), modelo de dados e migrações SQL para Supabase com RLS, integração backend com Google Maps Routes API (computeRoutes) e cálculo de rotas com fallback de rascunho, fluxo de autenticação e perfis (Admin e Operacional), tela de configuração pendente e interface moderna em Tailwind CSS.",
+  "updatedAt":  "2026-10-30T22:01:48.561249341Z",
+  "requestFeedback":  true,
+  "userFacing":  true
+}

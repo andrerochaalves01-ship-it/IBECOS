@@ -1,0 +1,6 @@
+{
+  "name": "IBEC Express | Central de Solicitações",
+  "description": "Plataforma operacional para lançamento e acompanhamento de solicitações de motoboy, utilitário, passeio e press kit.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
