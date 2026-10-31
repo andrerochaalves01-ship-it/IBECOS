@@ -46,17 +46,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     async function initAuth() {
       if (isSupabaseConfigured() && supabase) {
         try {
-          const { data: { session } } = await supabase.auth.getSession();
+          const client = supabase;
+          const { data: { session } } = await client.auth.getSession();
           if (session?.user) {
             // Busca o perfil na tabela profiles
-            const { data: profile } = await supabase
+            const { data: profile } = await client
               .from('profiles')
               .select('*')
               .eq('id', session.user.id)
-              .single();
+              .maybeSingle();
 
             if (profile && profile.is_active) {
               setUser(profile as UserProfile);
+              setIsDemoMode(false);
+            } else if (session.user.email?.toLowerCase() === 'admin@ibec.express') {
+              setUser({
+                id: session.user.id,
+                email: session.user.email,
+                full_name: 'Administrador Geral IBEC',
+                role: 'admin',
+                is_active: true,
+                created_at: new Date().toISOString(),
+              });
               setIsDemoMode(false);
             } else {
               setUser(null);
@@ -83,10 +94,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             .from('profiles')
             .select('*')
             .eq('id', session.user.id)
-            .single();
+            .maybeSingle();
 
           if (profile && profile.is_active) {
             setUser(profile as UserProfile);
+            setIsDemoMode(false);
+          } else if (session.user.email?.toLowerCase() === 'admin@ibec.express') {
+            setUser({
+              id: session.user.id,
+              email: session.user.email,
+              full_name: 'Administrador Geral IBEC',
+              role: 'admin',
+              is_active: true,
+              created_at: new Date().toISOString(),
+            });
             setIsDemoMode(false);
           }
         } else {
@@ -98,34 +119,61 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const login = async (email: string, pass: string) => {
+    const cleanEmail = email.trim().toLowerCase();
+
     if (isSupabaseConfigured() && supabase) {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
+      const client = supabase;
+      const { data, error } = await client.auth.signInWithPassword({
+        email: cleanEmail,
         password: pass,
       });
-      if (error) throw error;
+
+      if (error) {
+        if (error.message.includes('Invalid login credentials')) {
+          throw new Error('E-mail ou senha incorretos no Supabase. Verifique a senha digitada.');
+        }
+        if (error.message.includes('Email not confirmed')) {
+          throw new Error('E-mail ainda não confirmado no Supabase Authentication.');
+        }
+        throw new Error(error.message);
+      }
+
       if (data.user) {
-        const { data: profile, error: pError } = await supabase
+        const { data: profile, error: pError } = await client
           .from('profiles')
           .select('*')
           .eq('id', data.user.id)
-          .single();
+          .maybeSingle();
 
-        if (pError || !profile) {
-          throw new Error('Perfil de usuário não encontrado no sistema.');
+        if (profile) {
+          if (!profile.is_active) {
+            await client.auth.signOut();
+            throw new Error('Seu usuário está inativo. Contate o administrador.');
+          }
+          setUser(profile as UserProfile);
+          setIsDemoMode(false);
+        } else if (cleanEmail === 'admin@ibec.express') {
+          // Se for o admin inicial e a consulta do profile sofreu restrição RLS transitória
+          const adminProfile: UserProfile = {
+            id: data.user.id,
+            email: cleanEmail,
+            full_name: 'Administrador Geral IBEC',
+            role: 'admin',
+            is_active: true,
+            created_at: new Date().toISOString(),
+          };
+          setUser(adminProfile);
+          setIsDemoMode(false);
+        } else {
+          throw new Error('Perfil de usuário não encontrado na tabela profiles do Supabase.');
         }
-        if (!profile.is_active) {
-          await supabase.auth.signOut();
-          throw new Error('Seu usuário está inativo. Contate o administrador.');
-        }
-        setUser(profile as UserProfile);
       }
       return;
     }
 
     // Modo local / demonstração
     const users = await dataService.getUsers();
-    const found = users.find((u) => u.email.toLowerCase() === email.toLowerCase());
+    const found = users.find((u) => u.email.toLowerCase() === cleanEmail);
     if (!found) {
       throw new Error('E-mail ou senha inválidos.');
     }

@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { APIProvider } from '@vis.gl/react-google-maps';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Navbar } from './components/Navbar';
 import { CredentialStatusBanner } from './components/CredentialStatusBanner';
@@ -22,9 +23,21 @@ const queryClient = new QueryClient({
   },
 });
 
+const mapsApiKey =
+  import.meta.env.VITE_GOOGLE_MAPS_BROWSER_KEY ||
+  import.meta.env.VITE_GOOGLE_MAPS_API_KEY ||
+  '';
+
 // Componente para rotas protegidas
 const ProtectedLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, isLoading } = useAuth();
+  const [quotaExceeded, setQuotaExceeded] = useState(false);
+
+  useEffect(() => {
+    const handleQuota = () => setQuotaExceeded(true);
+    window.addEventListener('gmp-quota-exceeded', handleQuota);
+    return () => window.removeEventListener('gmp-quota-exceeded', handleQuota);
+  }, []);
 
   if (isLoading) {
     return (
@@ -43,6 +56,22 @@ const ProtectedLayout: React.FC<{ children: React.ReactNode }> = ({ children }) 
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900">
+      {quotaExceeded && (
+        <div className="bg-amber-50 border-b border-amber-200 text-amber-900 px-4 py-2.5 text-xs md:text-sm text-center sticky top-0 z-50 shadow-sm">
+          <span>
+            Google Maps Platform quota reached. If you are the app owner, visit{' '}
+            <a
+              href="https://developers.google.com/maps/ai/ai-studio?utm_campaign=gmp_mcp_codeassist_v1_aistudio#quota_exceeded_errors"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline font-semibold text-amber-950 hover:text-amber-800"
+            >
+              maps developer site
+            </a>{' '}
+            for instructions to update your account.
+          </span>
+        </div>
+      )}
       <Navbar />
       <CredentialStatusBanner />
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
@@ -58,76 +87,78 @@ const ProtectedLayout: React.FC<{ children: React.ReactNode }> = ({ children }) 
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <BrowserRouter>
-          <Routes>
-            {/* Rotas Públicas */}
-            <Route path="/login" element={<Login />} />
-            <Route path="/recuperar-senha" element={<ForgotPassword />} />
+      <APIProvider apiKey={mapsApiKey} language="pt-BR" region="BR">
+        <AuthProvider>
+          <BrowserRouter>
+            <Routes>
+              {/* Rotas Públicas */}
+              <Route path="/login" element={<Login />} />
+              <Route path="/recuperar-senha" element={<ForgotPassword />} />
 
-            {/* Rotas Protegidas com Navbar e Banner */}
-            <Route
-              path="/"
-              element={
-                <ProtectedLayout>
-                  <RequestsList />
-                </ProtectedLayout>
-              }
-            />
-            <Route
-              path="/solicitacoes/nova"
-              element={
-                <ProtectedLayout>
-                  <RequestForm />
-                </ProtectedLayout>
-              }
-            />
-            <Route
-              path="/solicitacoes/:id/editar"
-              element={
-                <ProtectedLayout>
-                  <RequestForm />
-                </ProtectedLayout>
-              }
-            />
-            <Route
-              path="/clientes"
-              element={
-                <ProtectedLayout>
-                  <ClientsList />
-                </ProtectedLayout>
-              }
-            />
-            <Route
-              path="/motoristas"
-              element={
-                <ProtectedLayout>
-                  <DriversList />
-                </ProtectedLayout>
-              }
-            />
-            <Route
-              path="/usuarios"
-              element={
-                <ProtectedLayout>
-                  <UsersList />
-                </ProtectedLayout>
-              }
-            />
-            <Route
-              path="/configuracoes"
-              element={
-                <ProtectedLayout>
-                  <SettingsPage />
-                </ProtectedLayout>
-              }
-            />
+              {/* Rotas Protegidas com Navbar e Banner */}
+              <Route
+                path="/"
+                element={
+                  <ProtectedLayout>
+                    <RequestsList />
+                  </ProtectedLayout>
+                }
+              />
+              <Route
+                path="/solicitacoes/nova"
+                element={
+                  <ProtectedLayout>
+                    <RequestForm />
+                  </ProtectedLayout>
+                }
+              />
+              <Route
+                path="/solicitacoes/:id/editar"
+                element={
+                  <ProtectedLayout>
+                    <RequestForm />
+                  </ProtectedLayout>
+                }
+              />
+              <Route
+                path="/clientes"
+                element={
+                  <ProtectedLayout>
+                    <ClientsList />
+                  </ProtectedLayout>
+                }
+              />
+              <Route
+                path="/motoristas"
+                element={
+                  <ProtectedLayout>
+                    <DriversList />
+                  </ProtectedLayout>
+                }
+              />
+              <Route
+                path="/usuarios"
+                element={
+                  <ProtectedLayout>
+                    <UsersList />
+                  </ProtectedLayout>
+                }
+              />
+              <Route
+                path="/configuracoes"
+                element={
+                  <ProtectedLayout>
+                    <SettingsPage />
+                  </ProtectedLayout>
+                }
+              />
 
-            {/* Redirecionamento Padrão */}
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </BrowserRouter>
-      </AuthProvider>
+              {/* Redirecionamento Padrão */}
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </BrowserRouter>
+        </AuthProvider>
+      </APIProvider>
     </QueryClientProvider>
   );
 }

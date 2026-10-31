@@ -1,13 +1,12 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   MapPin,
   Clock,
   Navigation,
   AlertTriangle,
   Info,
-  Calendar,
-  CheckCircle,
 } from 'lucide-react';
+import { Map, AdvancedMarker, Pin } from '@vis.gl/react-google-maps';
 import { ComputeRouteResponse, RequestStop, VehicleType } from '../types';
 import { formatDateTime, formatDuration, formatKilometers } from '../lib/formatters';
 
@@ -19,6 +18,11 @@ interface RouteMapVisualizerProps {
   isLoading?: boolean;
 }
 
+const mapsApiKey =
+  import.meta.env.VITE_GOOGLE_MAPS_BROWSER_KEY ||
+  import.meta.env.VITE_GOOGLE_MAPS_API_KEY ||
+  '';
+
 export const RouteMapVisualizer: React.FC<RouteMapVisualizerProps> = ({
   pickup,
   deliveries,
@@ -29,7 +33,7 @@ export const RouteMapVisualizer: React.FC<RouteMapVisualizerProps> = ({
   const validDeliveries = deliveries.filter((d) => d.address_full.trim().length > 0);
   const totalStops = 1 + validDeliveries.length;
 
-  // Calcula tempo total operacional: tempo de deslocamento + tempo de permanência em cada parada
+  // Calcula tempo total operacional: tempo de deslocamento + tempo de atendimento
   const totalServiceTimeMinutes =
     (pickup.service_time_minutes || 5) +
     validDeliveries.reduce((acc, curr) => acc + (curr.service_time_minutes || 5), 0);
@@ -40,6 +44,16 @@ export const RouteMapVisualizer: React.FC<RouteMapVisualizerProps> = ({
 
   // Previsão de chegada estimada
   const estimatedArrival = new Date(Date.now() + operationalTotalSeconds * 1000);
+
+  // Centro inicial do mapa (São Paulo por padrão ou coordenada da coleta)
+  const mapCenter = useMemo(() => {
+    if (pickup.lat && pickup.lng) {
+      return { lat: Number(pickup.lat), lng: Number(pickup.lng) };
+    }
+    return { lat: -23.5505, lng: -46.6333 }; // São Paulo SP
+  }, [pickup.lat, pickup.lng]);
+
+  const hasApiKey = Boolean(mapsApiKey && mapsApiKey.startsWith('AIzaSy'));
 
   return (
     <div className="bg-white border border-slate-200 rounded-lg p-5 shadow-sm space-y-4">
@@ -97,7 +111,10 @@ export const RouteMapVisualizer: React.FC<RouteMapVisualizerProps> = ({
               <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
                 Tempo Operacional Total
               </span>
-              <span className="text-xl font-extrabold text-slate-900 tabular-nums" title={`Inclui ${totalServiceTimeMinutes} min de atendimento nas paradas`}>
+              <span
+                className="text-xl font-extrabold text-slate-900 tabular-nums"
+                title={`Inclui ${totalServiceTimeMinutes} min de atendimento nas paradas`}
+              >
                 {formatDuration(operationalTotalSeconds)}
               </span>
             </div>
@@ -106,10 +123,57 @@ export const RouteMapVisualizer: React.FC<RouteMapVisualizerProps> = ({
                 Previsão de Chegada
               </span>
               <span className="text-xl font-extrabold text-emerald-700 tabular-nums">
-                {estimatedArrival.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                {estimatedArrival.toLocaleTimeString('pt-BR', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })}
               </span>
             </div>
           </div>
+
+          {/* Renderização do Mapa Google Interativo */}
+          {hasApiKey && (
+            <div className="rounded-lg overflow-hidden border border-slate-200 shadow-xs h-72 w-full relative">
+              <Map
+                mapId="DEMO_MAP_ID"
+                defaultCenter={mapCenter}
+                defaultZoom={12}
+                gestureHandling="cooperative"
+                disableDefaultUI={false}
+                internalUsageAttributionIds={['gmp_mcp_codeassist_v1_aistudio']}
+                className="w-full h-full"
+              >
+                {/* Marcador de Coleta */}
+                {pickup.lat && pickup.lng && (
+                  <AdvancedMarker
+                    position={{ lat: Number(pickup.lat), lng: Number(pickup.lng) }}
+                    title={`Coleta: ${pickup.company_name || pickup.address_full}`}
+                  >
+                    <Pin background="#FACC15" glyphColor="#000000" borderColor="#CA8A04">
+                      C
+                    </Pin>
+                  </AdvancedMarker>
+                )}
+
+                {/* Marcadores de Entregas */}
+                {validDeliveries.map(
+                  (d, idx) =>
+                    d.lat &&
+                    d.lng && (
+                      <AdvancedMarker
+                        key={idx}
+                        position={{ lat: Number(d.lat), lng: Number(d.lng) }}
+                        title={`Entrega #${idx + 1}: ${d.company_name || d.address_full}`}
+                      >
+                        <Pin background="#7C3AED" glyphColor="#FFFFFF" borderColor="#5B21B6">
+                          {idx + 1}
+                        </Pin>
+                      </AdvancedMarker>
+                    )
+                )}
+              </Map>
+            </div>
+          )}
 
           {/* Esquema Visual Interativo de Paradas e Rota */}
           <div className="border border-slate-200 rounded-lg p-4 bg-slate-950 text-white relative overflow-hidden">
@@ -176,7 +240,8 @@ export const RouteMapVisualizer: React.FC<RouteMapVisualizerProps> = ({
                       </p>
                       {delivery.contact_name && (
                         <p className="text-slate-400 text-[11px] mt-0.5">
-                          Contato: {delivery.contact_name} {delivery.contact_phone ? `(${delivery.contact_phone})` : ''}
+                          Contato: {delivery.contact_name}{' '}
+                          {delivery.contact_phone ? `(${delivery.contact_phone})` : ''}
                         </p>
                       )}
                     </div>

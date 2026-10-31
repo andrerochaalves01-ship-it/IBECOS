@@ -1,7 +1,16 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+// Remove sufixos como /rest/v1/ ou barras finais da URL para evitar erros na Auth API
+export const cleanSupabaseUrl = (url?: string): string => {
+  if (!url) return '';
+  return url.trim().replace(/\/rest\/v1\/?$/, '').replace(/\/+$/, '');
+};
+
+const rawUrl = import.meta.env.VITE_SUPABASE_URL;
+const rawKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+const supabaseUrl = cleanSupabaseUrl(rawUrl);
+const supabaseKey = rawKey?.trim();
 
 export const isSupabaseConfigured = (): boolean => {
   return Boolean(
