@@ -91,3 +91,5 @@ export async function createUserHandler(req: Request, res: Response) {
     });
   }
 }
+
+export default createUserHandler;
