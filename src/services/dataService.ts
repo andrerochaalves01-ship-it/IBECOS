@@ -458,17 +458,40 @@ export const dataService = {
     return getLocalData<UserProfile>(STORAGE_KEYS.USERS, INITIAL_USERS);
   },
 
-  async createUser(user: Omit<UserProfile, 'id' | 'created_at'>): Promise<UserProfile> {
+  async createUser(user: Omit<UserProfile, 'id' | 'created_at'> & { password?: string }): Promise<UserProfile> {
+    if (isSupabaseConfigured() && user.password) {
+      const response = await fetch('/api/admin/create-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fullName: user.full_name,
+          email: user.email,
+          password: user.password,
+          role: user.role,
+        }),
+      });
+
+      const resJson = await response.json();
+      if (!response.ok) {
+        throw new Error(resJson.error || 'Falha ao cadastrar usuário.');
+      }
+      return resJson.user as UserProfile;
+    }
+
     if (isSupabaseConfigured() && supabase) {
-      const { data, error } = await supabase.from('profiles').insert([user]).select().single();
+      const { password, ...profileFields } = user;
+      const { data, error } = await supabase.from('profiles').insert([profileFields]).select().single();
       if (error) throw error;
       return data as UserProfile;
     }
 
     const list = getLocalData<UserProfile>(STORAGE_KEYS.USERS, INITIAL_USERS);
     const newUser: UserProfile = {
-      ...user,
       id: `usr-${Date.now()}`,
+      full_name: user.full_name,
+      email: user.email,
+      role: user.role,
+      is_active: true,
       created_at: new Date().toISOString(),
     };
     setLocalData(STORAGE_KEYS.USERS, [...list, newUser]);

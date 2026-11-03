@@ -1,5 +1,17 @@
 import React, { useEffect, useState } from 'react';
-import { Shield, UserPlus, CheckCircle, XCircle, AlertTriangle, X } from 'lucide-react';
+import {
+  Shield,
+  UserPlus,
+  CheckCircle,
+  XCircle,
+  AlertTriangle,
+  X,
+  Lock,
+  Eye,
+  EyeOff,
+  User,
+  Mail,
+} from 'lucide-react';
 import { UserProfile, UserRole } from '../types';
 import { dataService } from '../services/dataService';
 import { useAuth } from '../context/AuthContext';
@@ -14,8 +26,12 @@ export const UsersList: React.FC = () => {
   // Form states
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [role, setRole] = useState<UserRole>('operacional');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [modalError, setModalError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
 
   const loadUsers = async () => {
@@ -52,10 +68,33 @@ export const UsersList: React.FC = () => {
     );
   }
 
+  const handleOpenModal = () => {
+    setFullName('');
+    setEmail('');
+    setPassword('');
+    setConfirmPassword('');
+    setRole('operacional');
+    setModalError(null);
+    setShowPassword(false);
+    setIsModalOpen(true);
+  };
+
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
+    setModalError(null);
+
     if (!fullName.trim() || !email.trim()) {
-      alert('Preencha nome e e-mail.');
+      setModalError('Preencha nome completo e e-mail corporativo.');
+      return;
+    }
+
+    if (!password || password.length < 6) {
+      setModalError('A senha deve conter no mínimo 6 caracteres.');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setModalError('As senhas digitadas não coincidem.');
       return;
     }
 
@@ -65,17 +104,16 @@ export const UsersList: React.FC = () => {
         full_name: fullName.trim(),
         email: email.trim().toLowerCase(),
         role,
+        password: password,
         is_active: true,
       });
 
-      setFeedback(`Convite gerado para ${email}. O usuário receberá as instruções.`);
-      setTimeout(() => setFeedback(null), 6000);
-      setFullName('');
-      setEmail('');
+      setFeedback(`Usuário ${email.trim().toLowerCase()} cadastrado com sucesso! Acesso já liberado com a senha configurada.`);
+      setTimeout(() => setFeedback(null), 7000);
       setIsModalOpen(false);
       loadUsers();
     } catch (err: any) {
-      alert(`Erro: ${err.message}`);
+      setModalError(err.message || 'Erro ao cadastrar usuário.');
     } finally {
       setIsSubmitting(false);
     }
@@ -98,9 +136,12 @@ export const UsersList: React.FC = () => {
   return (
     <div className="space-y-6">
       {feedback && (
-        <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-lg text-xs font-semibold flex items-center justify-between shadow-xs">
-          <span>{feedback}</span>
-          <button onClick={() => setFeedback(null)} className="underline cursor-pointer">
+        <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-lg text-xs font-semibold flex items-center justify-between shadow-xs animate-in fade-in">
+          <div className="flex items-center gap-2">
+            <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>{feedback}</span>
+          </div>
+          <button onClick={() => setFeedback(null)} className="underline text-emerald-800 hover:text-emerald-950 cursor-pointer">
             Fechar
           </button>
         </div>
@@ -113,26 +154,26 @@ export const UsersList: React.FC = () => {
             Gestão de Usuários e Permissões
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Controle de acessos da equipe operacional e administradores do IBEC Express
+            Cadastro de novos operadores e administradores com definição direta de login e senha
           </p>
         </div>
 
         <button
-          onClick={() => setIsModalOpen(true)}
+          onClick={handleOpenModal}
           className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-violet-800 hover:bg-violet-900 text-white text-xs font-bold shadow-sm transition-colors cursor-pointer"
         >
-          <UserPlus className="w-4 h-4 text-amber-400" />
-          Convidar Usuário
+          <UserPlus className="w-4 h-4 text-amber-400 stroke-[2.5]" />
+          Cadastrar Usuário
         </button>
       </div>
 
       <div className="bg-amber-50 border border-amber-200 rounded-lg p-3.5 text-xs text-amber-900 flex items-start gap-2.5">
         <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
         <div>
-          <strong className="font-semibold block">Regra de Segurança Operacional:</strong>
+          <strong className="font-semibold block">Acesso Restrito ao Administrador:</strong>
           <span className="text-[11px]">
-            Não disponibilizamos cadastro público. Novos operadores só têm acesso após convite
-            expresso emitido por um administrador ativo no banco de dados.
+            Como administrador, você pode cadastrar diretamente o usuário e definir a senha de acesso inicial.
+            O operador poderá fazer login imediatamente com as credenciais cadastradas.
           </span>
         </div>
       </div>
@@ -213,63 +254,134 @@ export const UsersList: React.FC = () => {
         )}
       </div>
 
-      {/* Modal de Convidar Usuário */}
+      {/* Modal de Cadastrar Usuário e Senha */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-2xl border border-slate-200 max-w-md w-full overflow-hidden animate-in fade-in">
+          <div className="bg-white rounded-xl shadow-2xl border border-slate-200 max-w-md w-full overflow-hidden animate-in fade-in duration-200">
             <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
               <div className="flex items-center gap-2">
-                <Shield className="w-5 h-5 text-violet-800" />
-                <h3 className="text-base font-bold text-slate-900">Convidar Novo Usuário</h3>
+                <div className="w-8 h-8 rounded-lg bg-violet-100 text-violet-800 flex items-center justify-center">
+                  <UserPlus className="w-4 h-4 text-violet-800" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">Cadastrar Novo Usuário</h3>
+                  <p className="text-[11px] text-slate-500">Defina os dados e a senha de acesso inicial</p>
+                </div>
               </div>
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-700"
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleCreateUser} className="p-6 space-y-3.5 text-xs">
+            <form onSubmit={handleCreateUser} className="p-6 space-y-4 text-xs">
+              {modalError && (
+                <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-lg flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0 text-rose-600" />
+                  <span>{modalError}</span>
+                </div>
+              )}
+
               <div>
                 <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
                   Nome Completo *
                 </label>
-                <input
-                  type="text"
-                  required
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  placeholder="Ex: Lucas Silveira"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-800"
-                />
+                <div className="relative">
+                  <input
+                    type="text"
+                    required
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    placeholder="Ex: Carlos Eduardo Silveira"
+                    className="w-full pl-8 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-800 font-medium"
+                  />
+                  <User className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
+                </div>
               </div>
 
               <div>
                 <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
-                  E-mail Corporativo *
+                  E-mail de Acesso *
                 </label>
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="usuario@ibec.express"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-800"
-                />
+                <div className="relative">
+                  <input
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="operador@ibec.express"
+                    className="w-full pl-8 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-800 font-medium"
+                  />
+                  <Mail className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
+                </div>
+              </div>
+
+              <div className="space-y-3 p-3 bg-slate-50 border border-slate-200 rounded-lg">
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block font-bold text-slate-800 uppercase tracking-wider text-[11px]">
+                      Senha de Acesso Inicial *
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="text-violet-800 hover:text-violet-950 font-semibold inline-flex items-center gap-1 text-[11px]"
+                    >
+                      {showPassword ? (
+                        <>
+                          <EyeOff className="w-3 h-3" /> Ocultar
+                        </>
+                      ) : (
+                        <>
+                          <Eye className="w-3 h-3" /> Visualizar
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  <div className="relative">
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      required
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Mínimo de 6 caracteres"
+                      className="w-full pl-8 pr-3 py-2 bg-white border border-slate-300 rounded-md text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-800 font-medium"
+                    />
+                    <Lock className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-800 uppercase tracking-wider text-[11px] mb-1">
+                    Confirmar Senha *
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      required
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="Repita a mesma senha"
+                      className="w-full pl-8 pr-3 py-2 bg-white border border-slate-300 rounded-md text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-800 font-medium"
+                    />
+                    <Lock className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
+                  </div>
+                </div>
               </div>
 
               <div>
                 <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
-                  Perfil de Acesso *
+                  Perfil de Permissão *
                 </label>
                 <select
                   value={role}
                   onChange={(e) => setRole(e.target.value as UserRole)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 font-medium"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 font-semibold focus:outline-none focus:ring-2 focus:ring-violet-800"
                 >
-                  <option value="operacional">Operacional (Lança solicitações, clientes e motoristas)</option>
-                  <option value="admin">Administrador (Acesso total e gestão de usuários)</option>
+                  <option value="operacional">Operacional (Lança e acompanha solicitações, clientes e motoristas)</option>
+                  <option value="admin">Administrador (Acesso total e gestão de usuários/senhas)</option>
                 </select>
               </div>
 
@@ -285,9 +397,9 @@ export const UsersList: React.FC = () => {
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="px-4 py-2 font-bold text-white bg-violet-800 hover:bg-violet-900 rounded-lg shadow-sm"
+                  className="px-5 py-2 font-bold text-white bg-violet-800 hover:bg-violet-900 rounded-lg shadow-sm transition-colors cursor-pointer disabled:opacity-50"
                 >
-                  {isSubmitting ? 'Gerando convite...' : 'Emitir Convite'}
+                  {isSubmitting ? 'Cadastrando usuário...' : 'Salvar e Ativar Acesso'}
                 </button>
               </div>
             </form>

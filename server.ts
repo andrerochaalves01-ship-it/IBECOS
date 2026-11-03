@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { computeRouteHandler } from './api/routes/compute.ts';
+import { createUserHandler } from './api/admin/create-user.ts';
 
 dotenv.config();
 
@@ -46,6 +47,11 @@ async function startServer() {
   // Rota de cálculo de rotas (Google Maps computeRoutes)
   app.post('/api/routes/compute', (req, res) => {
     computeRouteHandler(req, res);
+  });
+
+  // Rota administrativa para criação direta de usuário e senha
+  app.post('/api/admin/create-user', (req, res) => {
+    createUserHandler(req, res);
   });
 
   // Em desenvolvimento, conecta os middlewares do Vite
